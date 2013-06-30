@@ -1,0 +1,702 @@
+head	1.23;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.23
+date	2013.06.30.22.08.19;	author root;	state Exp;
+branches;
+next	1.22;
+
+1.22
+date	2013.06.30.22.02.30;	author root;	state Exp;
+branches;
+next	1.21;
+
+1.21
+date	2013.06.30.22.00.37;	author root;	state Exp;
+branches;
+next	1.20;
+
+1.20
+date	2013.06.30.21.39.57;	author root;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2013.06.30.21.19.56;	author root;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2013.06.30.20.22.38;	author root;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2013.06.30.20.06.21;	author root;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2013.06.30.20.03.13;	author root;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2013.06.30.20.00.57;	author root;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2013.06.30.19.56.49;	author root;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2013.06.30.19.52.41;	author root;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2013.06.30.19.51.45;	author root;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2013.06.30.19.51.22;	author root;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2013.06.30.19.49.43;	author root;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2013.06.30.19.43.30;	author root;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2013.06.30.19.39.14;	author root;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2013.06.30.19.10.39;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.06.30.19.10.29;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.06.30.19.04.42;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.06.30.19.01.36;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.06.30.18.53.54;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.06.30.18.49.15;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.06.30.18.39.17;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@Attempt to control fan speed based on temperature
+@
+
+
+1.23
+log
+@Cull some duplicate "Waitinf for fan to stabilize" messages
+@
+text
+@#!/usr/bin/perl
+# vi: sw=3 ai sm:
+
+# WARNING: This has only been tested on my own MacBook (mid-2012 model)
+#
+# This script polls the system temperatures at 1-second intervals, and
+# adjusts the fan speed accordingly to prevent overheating. The script
+# features aggressive ramp-ups and extremely conservative ramp-downs;
+# in other words we are working on the assumption that a loud computer
+# is way better than an unusable one in a triple-beep situation.
+
+use strict;
+use integer;
+
+use Getopt::Long;
+
+###############################################################################
+# Configurable parameters
+
+# List of temperature sensors - I have no idea what most of these sensors are.
+# I just know to be afraid if they read high.
+my @@sensors = qw(
+      TA0P TB0T TB1T  TB2T TCGC TCSA  TCTD TCXC TC0E
+      TC0F TC0J TC0P  TC1C TC2C TG1D  TM0P TM0S TPCD
+   );
+my $fan_speed_min = 2500;
+my $fan_speed_max = 6200;
+my $temp_setpoint = 55;
+my $temp_epsilon = 1;
+my $time_delta = 1;
+my $ramp_down_countdown_initial = 15;
+my $ramp_down_countdown;
+my $log_interval = 15;
+
+###############################################################################
+
+use vars qw( $verbose_p );
+
+GetOptions(
+   'verbose|v' => sub { $verbose_p += 1 },
+) || exit(1);
+
+use vars qw( $log_forced );
+
+sub force_logging () {
+   $log_forced = 1;
+}
+
+sub unforce_logging () {
+   $log_forced = 0;
+}
+
+sub logging ($@@) {
+   my($flag, $fmt, @@args) = @@_;
+   my $t = time;
+   my $msg = sprintf $fmt, @@args;
+   chomp $msg;
+   printf STDERR "%u%s\t%s\n", $t, $flag, $msg if $verbose_p || $log_forced;
+}
+
+sub log_info {
+   logging '#', @@_;
+}
+
+sub log_read {
+   logging 'r', @@_;
+}
+
+sub log_write {
+   logging 'w', @@_;
+}
+
+sub handler {
+   my($sig) = @@_;
+   log_info "Caught a SIG$sig, shutting down\n";
+   exit(1);
+}
+$SIG{'HUP'} = sub { exec { $0 } $0 };
+$SIG{'HUP'} = \&handler;
+$SIG{'INT'} = \&handler;
+$SIG{'QUIT'} = \&handler;
+$SIG{'TERM'} = \&handler;
+
+sub read_sensor ($) {
+   my($key) = @@_;
+   my $pid = open(SENSORS, '-|');
+   die "fork: $!\n" unless defined $pid;
+   if (!$pid) {
+      my $sensors = '/usr/local/sbin/smc';
+      my @@cmd = ($sensors, '-k', $key, '-r');
+      log_info("@@cmd") if $verbose_p > 1;
+      exec {$sensors} @@cmd;
+      die "$sensors: exec: $!\n";
+   }
+   my $data = scalar <SENSORS>;
+   log_read($data) if $verbose_p > 1;
+   close SENSORS;
+   my $it;
+   my $key_re = quotemeta($key);
+   if ($data =~ /$key_re  \[....\]  (\d+) \(.*\)/) {
+      $it = $1;
+   } elsif ($data =~ /(?=T)$key  \[sp78\]  \(bytes (.*)\)/) {
+      my @@bytes = map { hex($_) } split(/ /, $1);
+      no integer;
+      $it = $bytes[0] + $bytes[1]/256.0 if $bytes[0] && $bytes[0] != 0xff;
+   } elsif ($data =~ /no data/) {
+      $it = undef;
+   }
+   return $it;
+}
+
+sub write_sensor ($$$) {
+   my($key, $type, $intval) = @@_;
+   my $pid = open(SENSORS, '|-');
+   die "fork: $!\n" unless defined $pid;
+   if (!$pid) {
+      my $sensors = '/usr/local/sbin/smc';
+      my $code;
+      if ($type eq 'ui16') {
+	 $code = sprintf "%04x", $intval;
+      } elsif ($type eq 'sp78') {
+	 $code = sprintf "%04x", ($intval << 2);
+      } else {
+	 die;
+      }
+      my @@cmd = ($sensors, '-k', $key, '-w', $code);
+      log_info("@@cmd") if $verbose_p > 1;
+      exec {$sensors} @@cmd;
+      die "$sensors: exec: $!\n";
+   }
+   close SENSORS;
+}
+
+sub target_fan_speed (;$) {
+   my($speed) = @@_;
+   if (!defined $speed) {
+      $speed = read_sensor('F0Tg');
+   } else {
+      write_sensor('FS! ', 'ui16', 1);
+      write_sensor('F0Tg', 'sp78', $speed);
+   }
+   return $speed;
+}
+
+################################################################################
+
+my $fan_speed_setpoint = target_fan_speed;
+force_logging;
+log_info "Temperature setpoint %d deg C, current fan speed setpoint %d", $temp_setpoint, $fan_speed_setpoint;
+target_fan_speed $fan_speed_setpoint; # in case FS! has not been set
+for (my($last_temp_high, $last_setpoint, $last_wait);;) {
+   my @@temp = map { read_sensor($_) } @@sensors;
+   my $temp_high = (sort {$b <=> $a} @@temp)[0];
+   my $fan_speed = read_sensor('F0Ac');
+
+   # Periodic logging - don't log too often or the disk will not spin down
+
+   force_logging if (time % $log_interval) == 0 || $temp_high > $temp_setpoint;
+   my $fmt_periodic = '%ddegC(hi)';
+   $fmt_periodic .= ($verbose_p > 1)? ', %drpm': '%0.0s';
+   $fmt_periodic .= ' @@%d';
+   if ($verbose_p > 1 || ($temp_high != $last_temp_high)
+		      || ($fan_speed_setpoint != $last_setpoint)) {
+
+      log_info $fmt_periodic, $temp_high, $fan_speed, $fan_speed_setpoint;
+      $last_temp_high = $temp_high;
+      $last_setpoint = $fan_speed_setpoint;
+   }
+
+   # Make sure the fan speed has not been changed by someone else
+
+   my $actual_setpoint = target_fan_speed;
+   if ($actual_setpoint != $fan_speed_setpoint) {
+      log_info "Setpoint changed to %d by an external agent", $actual_setpoint;
+      $fan_speed_setpoint = $actual_setpoint;
+   }
+
+   # Temperature higher than our setpoint. The machine is getting too hot.
+   # This is critical.
+
+   if ($temp_high > $temp_setpoint) {
+      # If we got too hot, forget about ramping down - it's too dangerous
+      undef $ramp_down_countdown;
+      if ($fan_speed > $fan_speed_setpoint) { # set point too low
+	 my $delta = ($fan_speed_max - $fan_speed_setpoint)/3;
+	 $delta = 1 if $delta < 1;
+	 my $target = $fan_speed_setpoint + $delta;
+	 if ($target <= $fan_speed_max) {
+	    force_logging;
+	    log_info "Ramping up to $target\n";
+	    $fan_speed_setpoint = target_fan_speed($target);
+	    undef $last_wait;
+	 }
+      } elsif ($fan_speed < $fan_speed_setpoint && $fan_speed_setpoint < $fan_speed_max) {
+	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
+	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
+	 $last_wait = $fan_speed_setpoint;
+      }
+
+   # Temperature lower than our setpoint. The fan might be a bit too loud?
+   # Maybe. Hot is dangerous, so ramping down the fan is a very low priority.
+
+   } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
+      if ($fan_speed > $fan_speed_setpoint) { # set point too low
+	 my $midpoint = $fan_speed_min + ($fan_speed_max - $fan_speed_min)/2;
+	 my $delta = ($fan_speed_setpoint - $midpoint)/16;
+	 $delta = 1 if $delta < 1 || $fan_speed_setpoint < $midpoint;
+	 my $target = $fan_speed_setpoint - $delta;
+	 if ($target >= $fan_speed_min) {
+	    if (!defined $ramp_down_countdown) {
+	       # Monitor the situation for a while before we believe we really
+	       # are probably too cool and maybe we should ramp down the fan.
+	       $ramp_down_countdown = $ramp_down_countdown_initial;
+	       log_info "Setting ramp-down countdown to $ramp_down_countdown";
+	    } else {
+	       $ramp_down_countdown -= 1;
+	       if ($ramp_down_countdown <= 0) {
+		  force_logging;
+		  log_info "Ramping down to $target";
+		  $fan_speed_setpoint = target_fan_speed($target);
+		  undef $last_wait;
+		  undef $ramp_down_countdown;
+	       }
+	    }
+	 }
+      } elsif ($fan_speed > $fan_speed_setpoint) {
+	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
+	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
+	 $last_wait = $fan_speed_setpoint;
+      }
+   }
+
+   unforce_logging;
+   sleep($time_delta);
+}
+@
+
+
+1.22
+log
+@Wrong rpm logged, non-verbose periodic should log target, not actual rpm
+@
+text
+@d151 1
+a151 1
+for (my($last_temp_high, $last_setpoint);;) {
+d192 1
+d195 3
+a197 1
+	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n";
+d221 1
+d227 3
+a229 1
+	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n";
+@
+
+
+1.21
+log
+@Cull some duplicated periodic information from the logs
+@
+text
+@d159 3
+a161 2
+   my $fmt_periodic = '%ddegC(hi), %drpm';
+   $fmt_periodic .= ' @@%d' if $verbose_p > 1;
+@
+
+
+1.20
+log
+@Check the actual setpoint and react if changed by someone outside the daemon
+@
+text
+@d151 1
+a151 1
+for (;;) {
+d156 2
+d159 9
+a167 1
+   log_info "%ddegC(hi), %drpm @@%d", $temp_high, $fan_speed, $fan_speed_setpoint;
+@
+
+
+1.19
+log
+@Let's see if 55 deg C is safe =p
+@
+text
+@d150 1
+a154 1
+   my $fan_speed_target = target_fan_speed;
+d159 8
+@
+
+
+1.18
+log
+@Don't clutter the logs with waiting for stabilization messages if our current
+setpoint is already at the max
+@
+text
+@d28 1
+a28 1
+my $temp_setpoint = 50;
+@
+
+
+1.17
+log
+@Shorten the periodic log message yet more
+@
+text
+@d174 1
+a174 1
+      } elsif ($fan_speed < $fan_speed_setpoint) {
+@
+
+
+1.16
+log
+@Comment tweak
+@
+text
+@d157 1
+a157 1
+   log_info "%d deg C high, fan speed %d @@ %d", $temp_high, $fan_speed, $fan_speed_setpoint;
+@
+
+
+1.15
+log
+@Tweak log message
+@
+text
+@d178 1
+a178 1
+   # Temperature lower than our setpoint. The machine might be a bit too cool?
+@
+
+
+1.14
+log
+@Change the rampdown amount to a variable amount that can be larger than 1
+@
+text
+@d157 1
+a157 1
+   log_info "temp_high = $temp_high, fan_speed = $fan_speed\n";
+@
+
+
+1.13
+log
+@Force-log the ramp-up and ramp-down notices
+@
+text
+@d166 3
+a168 3
+	 my $fan_speed_delta = ($fan_speed_max - $fan_speed_setpoint)/3;
+	 $fan_speed_delta = 1 if $fan_speed_delta < 1;
+	 my $target = $fan_speed_setpoint + $fan_speed_delta;
+d183 4
+a186 1
+	 my $target = $fan_speed_setpoint - 1;
+@
+
+
+1.12
+log
+@60 seconds for rampdown is too gentle
+@
+text
+@d170 1
+d193 1
+@
+
+
+1.11
+log
+@Move configurable parameters to the top
+@
+text
+@d31 1
+a31 1
+my $ramp_down_countdown_initial = 60;
+@
+
+
+1.10
+log
+@Attempt to handle signals, but apparently not working
+@
+text
+@d17 20
+a146 8
+# I have no idea what most of these sensors are
+# I just know to be afraid if they read high
+my @@sensors = qw(
+      TA0P TB0T TB1T  TB2T TCGC TCSA  TCTD TCXC TC0E
+      TC0F TC0J TC0P  TC1C TC2C TG1D  TM0P TM0S TPCD
+   );
+my $fan_speed_min = 2500;
+my $fan_speed_max = 6200;
+a147 6
+my $temp_setpoint = 50;
+my $temp_epsilon = 1;
+my $time_delta = 1;
+my $ramp_down_countdown_initial = 60;
+my $ramp_down_countdown;
+my $log_interval = 15;
+@
+
+
+1.9
+log
+@Be a little careful with keys in regexps
++ start the setpoint with the actual current F0Tg reading
+@
+text
+@d53 11
+@
+
+
+1.8
+log
+@Fixed header comments and removed some dead code
+@
+text
+@d68 2
+a69 1
+   if ($data =~ /$key  \[....\]  (\d+) \(.*\)/) {
+d124 1
+a124 1
+my $fan_speed_setpoint = ($fan_speed_max + $fan_speed_min)/2;
+a132 1
+target_fan_speed($fan_speed_setpoint);
+@
+
+
+1.7
+log
+@Ramp down even slower - make the countdown timer start at 60s
+@
+text
+@a2 1
+# WARNING: THIS CODE DOES NOT WORK. DO NOT USE IT!!!
+d4 1
+a4 1
+# usage: mrtg-getinfo-sensors
+d6 5
+a10 4
+# This script polls information from smc(8) and outputs the polled
+# information in a format usable by mrtg. It can also function as a required
+# file, in which case it will gather the data from sensors(1) but not output
+# anything to stdout.
+a16 4
+use POSIX;
+use Unix::Uptime;
+
+use vars qw( @@sensorsflags );
+d19 3
+a21 11
+# See if we are being require'd from another perl5 program.
+# If we are, we expect caller(0) to return non-null information;
+# in particular, $subroutine should be "(eval)" (by empirical observation).
+
+my($package, $filename, $line, $subroutine, $hasargs, $wantargs) = caller(0);
+if (! defined $subroutine) {
+   GetOptions(
+      'debug' => sub { @@sensorsflags = qw(-c /etc/sensors.new) },
+      'verbose|v' => sub { $verbose_p += 1 },
+   ) || exit(1);
+}
+d157 1
+a157 1
+	 log_info "Waiting for fan to stabilize to $fan_speed_setpoint\n";
+d182 1
+a182 1
+	 log_info "Waiting for fan to stabilize to $fan_speed_setpoint\n";
+@
+
+
+1.6
+log
+@Comment a bit more
+@
+text
+@d139 1
+a139 1
+my $ramp_down_countdown_initial = 30;
+@
+
+
+1.5
+log
+@Ramp up quicker - instead of ramping up by a set amount, we ramp up
+whatever is 1/3 of the difference between the setpoint and the max speed
+@
+text
+@d158 1
+d180 2
+@
+
+
+1.4
+log
+@Force logging at specified intervals or when a "too hot" event occurs
+@
+text
+@a134 1
+my $fan_speed_delta = 25;
+d160 2
+@
+
+
+1.3
+log
+@Delay rampdowns because they are more dangerous
+@
+text
+@d35 10
+d50 1
+a50 1
+   printf STDERR "%u%s\t%s\n", $t, $flag, $msg if $verbose_p;
+d142 2
+d151 2
+d194 1
+@
+
+
+1.2
+log
+@Minor display fixes + ramp up a bit more
+@
+text
+@d130 2
+d145 1
+d163 11
+a173 2
+	    log_info "Ramping down to $target";
+	    $fan_speed_setpoint = target_fan_speed($target);
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d36 1
+a36 1
+   my($flag, $msg) = @@_;
+d38 1
+d125 1
+a125 1
+my $fan_speed_delta = 10;
+d130 2
+d139 4
+a142 1
+   if ($temp_high > $temp_setpoint) { # too hot - this is critical
+d152 4
+a158 1
+	 print "target=$target, fan_speed_min=$fan_speed_min\n";
+d160 1
+a160 1
+	    print STDERR "Ramping down to $target\n";
+d167 1
+@
