@@ -156,7 +156,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    my $temp_high = (sort {$b <=> $a} @temp)[0];
    my $fan_speed = read_sensor('F0Ac');
 
-   # Periodic logging - don't log too often or the disk will not spin down
+   # Periodic logging
 
    force_logging if (time % $log_interval) == 0 || $temp_high > $temp_setpoint;
    my $fmt_periodic = '%ddegC(hi)';
