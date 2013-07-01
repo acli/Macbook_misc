@@ -8,7 +8,7 @@ Fan and temperature control
 
 fanspeedd
 ---------
-This is daemon that is designed to be run from
+This Perl script is a daemon that is designed to be run from
 init(8),
 launchd(8)
 or [svscanboot(8)](http://cr.yp.to/daemontools/svscanboot.html)
@@ -35,7 +35,7 @@ This code descended directly from mrtg-get-sensors and fanspeed.
 
 fanspeed
 --------
-This is a wrapper to 
+This Perl script is a wrapper to 
 [smc(8)](https://github.com/hholtmann/smcFanControl/tree/master/smc-command)
 that gets and sets the fan speed (by twiddling F0Tg and FS!).
 It only knows about the first fan, if your Mac has more than one.
@@ -50,7 +50,7 @@ the fractional part being just the LSB divided by 256.
 
 mrtg-getinfo-sensors
 --------------------
-This is a wrapper to
+This Perl script is a wrapper to
 [smc(8)](https://github.com/hholtmann/smcFanControl/tree/master/smc-command)
 for getting sensor readings for
 [MRTG](http://oss.oetiker.ch/mrtg/).
@@ -65,9 +65,9 @@ Sleep and hibernation
 
 hibernate
 ---------
-This is a wrapper to pmset(8)
+This simple bash script is a wrapper to pmset(8)
 that puts the Mac into plain hibernation,
-i.e., power is shut off
+i.e., after dumping core to disk, power is shut off
 without the Mac first going through an hour-long sleep state.
 
 Note that hibernation
@@ -78,7 +78,7 @@ but I really don’t want to go through any more triple beeps.
 
 sleepnow
 --------
-This is a wrapper to pmset(8)
+This simple bash script is a wrapper to pmset(8)
 that puts the Mac into sleep
 without preparing for a fallback hibernation.
 
