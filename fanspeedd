@@ -29,7 +29,6 @@ my $temp_setpoint = 55;
 my $temp_epsilon = 1;
 my $time_delta = 1;
 my $ramp_down_countdown_initial = 15;
-my $ramp_down_rapidity_threshold = 3500;
 my $ramp_down_delta_min = 25;
 my $ramp_up_delta_min = 50;
 my $log_interval = 15;
@@ -148,6 +147,8 @@ sub target_fan_speed (;$) {
 
 my $fan_speed_setpoint = target_fan_speed;
 my $ramp_down_countdown;
+my @temp_history;
+
 force_logging;
 log_info "Temperature setpoint %d deg C, current fan speed setpoint %d", $temp_setpoint, $fan_speed_setpoint;
 target_fan_speed $fan_speed_setpoint; # in case FS! has not been set
@@ -156,16 +157,44 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    my $temp_high = (sort {$b <=> $a} @temp)[0];
    my $fan_speed = read_sensor('F0Ac');
 
+   # Keep track of previous temperature readings
+
+   unshift @temp_history, $temp_high;
+   splice @temp_history, (900/$time_delta + 1);
+
+   # Calculate averages
+
+   my($avg_1min, $avg_5min, $avg_15min);
+   do {
+      my @avg = ([60, 0, 0], [300, 0, 0], [900, 0, 0]);
+      for (my $i = 0; $i < @temp_history; $i += 1) {
+	 my $temp = $temp_history[$i];
+	 my $t = $i * $time_delta;
+	 for (my $j = 0; $j < @avg; $j += 1) {
+	    no integer;
+	    if ($t < $avg[$j]->[0]) {
+	       $avg[$j]->[1] += 1;
+	       $avg[$j]->[2] += $temp;
+	    }
+	 }
+      }
+      no integer;
+      $avg_1min = $avg[0]->[2] / $avg[0]->[1];
+      $avg_5min = $avg[1]->[2] / $avg[1]->[1];
+      $avg_15min = $avg[2]->[2] / $avg[2]->[1];
+   };
+
    # Periodic logging
 
    force_logging if (time % $log_interval) == 0 || $temp_high > $temp_setpoint;
-   my $fmt_periodic = '%ddegC(hi)';
-   $fmt_periodic .= ($verbose_p > 1)? ', %drpm': '%0.0s';
+   my $fmt_periodic = 'temp %d avg %.1f, %.1f, %.1f';
+   $fmt_periodic .= ($verbose_p > 1)? ', %d rpm': '%0.0s';
    $fmt_periodic .= ' @%d';
    if ($verbose_p > 1 || ($temp_high != $last_temp_high)
 		      || ($fan_speed_setpoint != $last_setpoint)) {
 
-      log_info $fmt_periodic, $temp_high, $fan_speed, $fan_speed_setpoint;
+      log_info $fmt_periodic, $temp_high, $avg_1min, $avg_5min, $avg_15min,
+	    $fan_speed, $fan_speed_setpoint;
       $last_temp_high = $temp_high;
       $last_setpoint = $fan_speed_setpoint;
    }
@@ -206,9 +235,11 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 
    } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
       if ($fan_speed > $fan_speed_setpoint) { # set point too high, maybe
-	 my $delta = ($fan_speed_setpoint - $ramp_down_rapidity_threshold)/16;
-	 if ($delta < 1 || $delta < $ramp_down_delta_min
-			|| $fan_speed_setpoint < $ramp_down_rapidity_threshold){
+	 my $delta = 15*($temp_high - $avg_1min)
+		   +  5*($temp_high - $avg_5min)
+		   +  1*($temp_high - $avg_15min);
+
+	 if ($delta < 1 || $delta < $ramp_down_delta_min) {
 	    $delta = 1;
 	    if ($fan_speed_setpoint - $ramp_down_delta_min >= $fan_speed_min) {
 	       $delta = $ramp_down_delta_min;
