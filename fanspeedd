@@ -136,8 +136,8 @@ sub target_fan_speed (;$) {
    if (!defined $speed) {
       $speed = read_sensor('F0Tg');
    } else {
-      write_sensor('FS! ', 'ui16', 1);
-      write_sensor('F0Tg', 'sp78', $speed);
+      write_sensor('FS! ', 'ui16', 1) unless read_sensor('FS! ') == 1;
+      write_sensor('F0Tg', 'sp78', $speed) unless read_sensor('F0Tg') == $speed;
    }
    return $speed;
 }
