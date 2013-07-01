@@ -5,7 +5,7 @@ speed to prevent overheating.
 must be installed or
 symlinked into /usr/local/sbin for this to work.
 
-The fan speed adjustments work on the assumption that “a loud computer
+The fan speed adjustments work on the assumption that “a noisy computer
 is better than an unusable one in the triple-beep state.” So it
 features **very aggressive ramp-ups** in fan speed, while ramp-downs are
 much more gentle. When temperature exceeds the setpoint, the fan speed
