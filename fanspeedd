@@ -30,6 +30,8 @@ my $temp_epsilon = 1;
 my $time_delta = 1;
 my $ramp_down_countdown_initial = 15;
 my $ramp_down_rapidity_threshold = 3500;
+my $ramp_down_delta_min = 25;
+my $ramp_up_delta_min = 50;
 my $log_interval = 15;
 
 ###############################################################################
@@ -186,6 +188,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
       undef $ramp_down_countdown;
       if ($fan_speed > $fan_speed_setpoint) { # set point too low
 	 my $delta = ($fan_speed_max - $fan_speed_setpoint)/3;
+	 $delta = $ramp_up_delta_min if $delta < $ramp_up_delta_min && $fan_speed_setpoint + $ramp_up_delta_min <= $fan_speed_max;
 	 $delta = 1 if $delta < 1;
 	 my $target = $fan_speed_setpoint + $delta;
 	 if ($target <= $fan_speed_max) {
@@ -203,8 +206,14 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 
    } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
       if ($fan_speed > $fan_speed_setpoint) { # set point too high, maybe
-	 my $delta = ($fan_speed_setpoint - $ramp_down_rapidity_threshold)/8;
-	 $delta = 1 if $delta < 1 || $fan_speed_setpoint < $ramp_down_rapidity_threshold;
+	 my $delta = ($fan_speed_setpoint - $ramp_down_rapidity_threshold)/12;
+	 if ($delta < 1 || $delta < $ramp_down_delta_min
+			|| $fan_speed_setpoint < $ramp_down_rapidity_threshold){
+	    $delta = 1;
+	    if ($fan_speed_setpoint - $ramp_down_delta_min >= $fan_speed_min) {
+	       $delta = $ramp_down_delta_min;
+	    }
+	 }
 	 my $target = $fan_speed_setpoint - $delta;
 	 if ($target >= $fan_speed_min) {
 	    if (!defined $ramp_down_countdown) {
