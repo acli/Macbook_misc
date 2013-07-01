@@ -25,9 +25,11 @@ much more gentle. When temperature exceeds the setpoint, the fan speed
 will very quickly be ramped up to the maximum of 6200rpm unless the
 temperature drops quickly.
 
-This has only been known to run on my Macbook and has yet to be
-conclusively proven
-that it actually does its job of preventing triple beep situations.
+This has only been known to run on my Macbook and seems to only delay
+the inevitable triple beep situation.
+(The last time it went triple beeping the last logged temperature was 52°C
+and the averages were 52.3°C, 52.3°C, 51.6°C —
+nowhere even near the setpoint even though the fan was stuck at 6200rpm).
 It also only knows how to manipulate one fan.
 So YMMV.
 

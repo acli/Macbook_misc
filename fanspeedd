@@ -25,9 +25,9 @@ my @sensors = qw(
    );
 my $fan_speed_min = 2500;
 my $fan_speed_max = 6200;
-my $temp_setpoint = 55;
-my $temp_epsilon = 1;
-my $time_delta = 1;
+my $ambient_threshold = 29;
+my $temp_setpoint = 52;		# beyond this is our definition of "too hot"
+my $time_delta = 1;		# poll interval
 my $ramp_down_countdown_initial = 15;
 my $ramp_down_delta_min = 25;
 my $ramp_up_delta_min = 50;
@@ -156,6 +156,7 @@ target_fan_speed $fan_speed_setpoint; # in case FS! has not been set
 for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    my @temp = map { read_sensor($_) } @sensors;
    my $temp_high = (sort {$b <=> $a} @temp)[0];
+   my $temp_ambient = read_sensor 'TA0P';
    my $fan_speed = read_sensor('F0Ac');
 
    # Keep track of previous temperature readings
