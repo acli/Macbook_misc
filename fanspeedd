@@ -195,7 +195,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    # Periodic logging
 
    force_logging if (time % $log_interval) == 0 || $temp_high > $temp_setpoint;
-   my $fmt_periodic = 'Temp %g amb %g avg %.1f, %.1f, %.1f';
+   my $fmt_periodic = 'Temp %.1f amb %.1f avg %.1f, %.1f, %.1f';
    $fmt_periodic .= ($verbose_p > 1)? ', %d rpm': '%0.0s';
    $fmt_periodic .= ' @%d';
    if ($verbose_p > 1 || ($temp_high != $last_temp_high)
