@@ -242,9 +242,10 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 
    } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
       if ($fan_speed > $fan_speed_setpoint) { # set point too high, maybe
-	 my $delta = 15*($temp_high - $avg_1min)
-		   +  5*($temp_high - $avg_5min)
-		   +  1*($temp_high - $avg_15min);
+	 my $delta = 15*($fan_speed_setpoint - $avg_1min)
+		   +  5*($fan_speed_setpoint - $avg_5min)
+		   +  1*($fan_speed_setpoint - $avg_15min)
+		   +  5*($temp_high - $avg_5min);
 
 	 if ($delta < 1 || $delta < $ramp_down_delta_min) {
 	    $delta = 1;
