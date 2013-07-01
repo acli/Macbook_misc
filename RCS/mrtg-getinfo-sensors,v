@@ -1,0 +1,312 @@
+head	1.7;
+access;
+symbols;
+locks
+	root:1.7; strict;
+comment	@# @;
+
+
+1.7
+date	2013.06.30.02.24.37;	author root;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2013.06.30.02.23.48;	author root;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2013.06.30.02.12.53;	author root;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2013.06.29.23.48.51;	author root;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2013.06.29.17.39.35;	author root;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2013.06.29.07.03.31;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2004.12.03.06.58.55;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@MRTG script to get info from sensors
+@
+
+
+1.7
+log
+@Take out the comment about formulas not being correct
+@
+text
+@#!/usr/bin/perl
+# vi: sw=3 ai sm:
+
+# usage: mrtg-getinfo-sensors
+#
+# This script polls information from smc(8) and outputs the polled
+# information in a format usable by mrtg. It can also function as a required
+# file, in which case it will gather the data from sensors(1) but not output
+# anything to stdout.
+
+use strict;
+use integer;
+
+use Getopt::Long;
+
+use POSIX;
+use Unix::Uptime;
+
+use vars qw( @@sensorsflags );
+use vars qw( $verbose_p );
+
+# See if we are being require'd from another perl5 program.
+# If we are, we expect caller(0) to return non-null information;
+# in particular, $subroutine should be "(eval)" (by empirical observation).
+
+my($package, $filename, $line, $subroutine, $hasargs, $wantargs) = caller(0);
+if (! defined $subroutine) {
+   GetOptions(
+      'debug' => sub { @@sensorsflags = qw(-c /etc/sensors.new) },
+      'verbose|v' => \$verbose_p,
+   ) || exit(1);
+}
+
+sub read_sensor ($) {
+   my($key) = @@_;
+   my $pid = open(SENSORS, '-|');
+   die "fork: $!\n" unless defined $pid;
+   if (!$pid) {
+      my $sensors = '/usr/local/sbin/smc';
+      my @@cmd = ($sensors, '-k', $key, '-r');
+      printf STDERR "%u#\t%s\n", time, "@@cmd" if $verbose_p;
+      exec {$sensors} @@cmd;
+      die "$sensors: exec: $!\n";
+   }
+   my $data = scalar <SENSORS>;
+   close SENSORS;
+   my $it;
+   if ($data =~ /$key  \[....\]  (\d+) \(.*\)/) {
+      $it = $1;
+   } elsif ($data =~ /(?=T)$key  \[sp78\]  \(bytes (.*)\)/) {
+      # These formulas may or may not be correct, but apparently they are
+      my @@bytes = map { hex($_) } split(/ /, $1);
+      no integer;
+      $it = $bytes[0] + $bytes[1]/256.0;
+   } elsif ($data =~ /no data/) {
+      $it = undef;
+   }
+   return $it;
+}
+
+sub get_hostname () {
+   my($sysname, $nodename, $release, $version, $machine) = POSIX::uname();
+   my $hostname = $nodename;
+   $hostname = $1 if $hostname =~ /^en[01]\.([^\.]+)\./; # hack for ada.dhs.org
+   return $hostname;
+}
+
+sub format_value ($) {
+   my($val) = @@_;
+   return defined $val && $val =~ /\S/s? $val: '##UNDEF##';
+}
+
+sub format_uptime ($) {
+   my($uptime) = @@_;
+   my $it = '';
+   if ($uptime >= 86400) {
+      my($days) = int($uptime/86400);
+      $it .= sprintf("%d day%s, ", $days, $days == 1? "": "s");
+   }
+   $it .= sprintf("%02d:%02d:%02d",
+	 ($uptime/3600)%24, ($uptime/60)%60, $uptime%60);
+   return $it;
+}
+
+################################################################################
+
+my $fan0 = read_sensor(@@ARGV > 0? $ARGV[0]: 'F0Ac');
+my $fan1 = read_sensor(@@ARGV > 1? $ARGV[1]: 'F1Ac');
+my $uptime = Unix::Uptime->uptime();
+my $hostname = get_hostname;
+
+printf "%s\n%s\n%s\n%s\n", format_value($fan0), format_value($fan1), format_uptime($uptime), $hostname;
+1;
+@
+
+
+1.6
+log
+@It's of course $1, not 1 !
+@
+text
+@d51 1
+a51 3
+      # FIXME
+      # FIXME THESE FORMULAS ARE NOT CORRECT
+      # FIXME
+@
+
+
+1.5
+log
+@I think I got it right, maybe
+Why do people do (x << 2)/64? That's simply division by 256,
+or just taking the MSB!!
+@
+text
+@d49 1
+a49 1
+      $it = 1;
+@
+
+
+1.4
+log
+@use strict
+Exploring ways to read out the temperature values. No luck yet.
+@
+text
+@a54 1
+      my $val = unpack('n', pack('cc', @@bytes));
+d56 1
+a56 4
+      $it = (($val >> 1) >> 2)/64.0;	# see smcFanControl/Classes/smcWrapper.m
+      $it *= 2.0;
+      print "@@bytes => $val => $it ?\n";
+      die;
+@
+
+
+1.3
+log
+@Allow the script to be used for general sensor reading (e.g. temperatures)
+@
+text
+@d11 3
+d26 1
+a26 1
+($package, $filename, $line, $subroutine, $hasargs, $wantargs) = caller(0);
+d47 18
+a64 1
+   return $1 if $data =~ /$key  \[....\]  (\d+)/;
+@
+
+
+1.2
+log
+@Adapted for the Macbook and in our LAN environment
+@
+text
+@d73 2
+a74 2
+my $fan0 = read_sensor('F0Ac');
+my $fan1 = read_sensor('F1Ac');
+@
+
+
+1.1
+log
+@Import from ada
+@
+text
+@d1 2
+a2 1
+#!/usr/bin/perl5
+d6 1
+a6 1
+# This script polls information from sensors(1) and outputs the polled
+d12 4
+d31 10
+a40 33
+################################################################################
+
+my $pid = open(SENSORS, '-|');
+die "fork: $!\n" unless defined $pid;
+if (!$pid) {
+   my $sensors = '/usr/local/bin/sensors';
+   printf STDERR "%u#\t%s\n", time, "$sensors @@sensorsflags" if $verbose_p;
+   exec {$sensors} 'sensors', @@sensorsflags;
+   die "$sensors: exec: $!\n";
+}
+my %data;
+while (<SENSORS>) {
+   printf STDERR "%ur\t%s", time, $_ if $verbose_p;
+   if (/:$/) {	# keyword only, need to read "continuation line"
+      chomp;
+      my $key = $_;
+      $_ = scalar <SENSORS>;
+      printf STDERR "%ur\t%s", time, $_ if $verbose_p;
+      s/^\s*//s;
+      $_ = "$key $_";
+      printf STDERR "%u#\t%s", time, $_ if $verbose_p;
+   }
+   if (/^([^:]+):\s+([-+]?\d+(?:\.\d+)?)(?:\s*\S+)?(?:\s+\(.*\))?\s*$/) {
+      my($key, $val) = ($1, $2);
+      $data{$key} = $val;
+      # Special hacks for compatibility
+      if ($key eq 'Chassis Fan' && !defined $data{'Case Fan'}) {
+	 $data{'Case Fan'} = $val;
+      } elsif ($key =~ /^CPU Temp \(\w+\)$/ && !defined $data{'CPU Temp'}) {
+	 $data{'CPU Temp'} = $val;
+      } elsif ($key eq 'Power Fan' && !defined $data{'PSU Fan'}) {
+	 $data{'PSU Fan'} = $val;
+      }
+d42 3
+a45 1
+close(FILE_NR);
+d47 6
+a52 9
+open(UPTIME, "/proc/uptime") || die("/proc/uptime: $!\nstopped");
+<UPTIME> =~ /^(\d+)/;
+$uptime = $1;
+close(UPTIME);
+
+open(HOSTNAME, "/proc/sys/kernel/hostname") || die("/proc/sys/kernel/hostname: $!\nstopped");
+$hostname = <HOSTNAME>;
+chomp $hostname;
+close(HOSTNAME);
+d54 4
+a57 19
+if (! defined $subroutine) {
+   my $data1 = $data{+(@@ARGV > 0? $ARGV[0]: 'temp1')};
+   my $data2 = $data{+(@@ARGV > 1? $ARGV[1]: 'temp2')};
+
+   # If we get zero for a fan speed, it is more likely that we used the wrong
+   # divisor, than that we actually have a non-spinning fan... Hmm :-(
+   $data1 = undef if !$data1 && $ARGV[0] =~ /\bfan\b/i;
+   $data2 = undef if !$data2 && $ARGV[1] =~ /\bfan\b/i;
+
+   if (defined $data1) {
+      printf "%g\n", $data1;
+   } else {
+      print "##UNDEF##\n";
+   }
+   if (defined $data2) {
+      printf "%g\n", $data2;
+   } else {
+      print "##UNDEF##\n";
+   }
+d59 3
+d64 1
+a64 1
+      printf("%d day%s, ", $days, $days == 1? "": "s");
+d66 3
+a68 2
+   printf("%02d:%02d:%02d\n", ($uptime/3600)%24, ($uptime/60)%60, $uptime%60);
+   printf("%s\n", $hostname);
+d70 9
+@

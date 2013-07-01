@@ -31,6 +31,15 @@ This is a wrapper to
 that gets and sets the fan speed (by twiddling F0Tg and FS!).
 It only knows about the first fan, if your Mac has more than one.
 
+mrtg-getinfo-sensors
+--------------------
+This is a wrapper to
+[smc(8)](https://github.com/hholtmann/smcFanControl/tree/master/smc-command)
+for getting sensor readings for
+[MRTG](http://oss.oetiker.ch/mrtg/).
+Only some sensors, specifically temperature and fan speed,
+are known to work.
+
 Sleep and hibernation control
 =============================
 
