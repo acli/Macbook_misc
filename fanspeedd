@@ -147,7 +147,8 @@ sub target_fan_speed (;$) {
 
 my $fan_speed_setpoint = target_fan_speed;
 my $ramp_down_countdown;
-my @temp_history;
+my @temp_history_short;
+my @temp_history_long;
 
 force_logging;
 log_info "Temperature setpoint %d deg C, current fan speed setpoint %d", $temp_setpoint, $fan_speed_setpoint;
@@ -159,29 +160,35 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 
    # Keep track of previous temperature readings
 
-   unshift @temp_history, $temp_high;
-   splice @temp_history, (900/$time_delta + 1);
+   unshift @temp_history_short, $temp_high;
+   unshift @temp_history_long, $temp_high;
+   splice @temp_history_short, (900/$time_delta + 1);
+   splice @temp_history_long, (900/$time_delta + 1);
 
    # Calculate averages
 
    my($avg_1min, $avg_5min, $avg_15min);
    do {
-      my @avg = ([60, 0, 0], [300, 0, 0], [900, 0, 0]);
-      for (my $i = 0; $i < @temp_history; $i += 1) {
-	 my $temp = $temp_history[$i];
-	 my $t = $i * $time_delta;
-	 for (my $j = 0; $j < @avg; $j += 1) {
+      my @avg = (
+	    [\@temp_history_short, 60, 0, 0],
+	    [\@temp_history_short, 300, 0, 0],
+	    [\@temp_history_short, 900, 0, 0]
+	 );
+      for (my $j = 0; $j < @avg; $j += 1) {
+	 for (my $i = 0; $i < scalar @{$avg[$j]->[0]}; $i += 1) {
+	    my $temp = $avg[$j]->[0]->[$i];
+	    my $t = $i * $time_delta;
 	    no integer;
-	    if ($t < $avg[$j]->[0]) {
-	       $avg[$j]->[1] += 1;
-	       $avg[$j]->[2] += $temp;
+	    if ($t < $avg[$j]->[1]) {
+	       $avg[$j]->[2] += 1;
+	       $avg[$j]->[3] += $temp;
 	    }
 	 }
       }
       no integer;
-      $avg_1min = $avg[0]->[2] / $avg[0]->[1];
-      $avg_5min = $avg[1]->[2] / $avg[1]->[1];
-      $avg_15min = $avg[2]->[2] / $avg[2]->[1];
+      $avg_1min = $avg[0]->[3] / $avg[0]->[2];
+      $avg_5min = $avg[1]->[3] / $avg[1]->[2];
+      $avg_15min = $avg[2]->[3] / $avg[2]->[2];
    };
 
    # Periodic logging
@@ -258,6 +265,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 		  force_logging;
 		  log_info "Ramping down to $target";
 		  $fan_speed_setpoint = target_fan_speed($target);
+		  @temp_history_short = ();
 		  undef $last_wait;
 		  undef $ramp_down_countdown;
 	       }
