@@ -1,4 +1,4 @@
-This is daemon that is designed to be run from inittab or svscanboot
+This is daemon that is designed to be run from init, launchd or svscanboot
 that monitors the system temperature and dynamically adjusts the fan
 speed to prevent overheating. The smc utility must be installed or
 symlinked into /usr/local/sbin for this to work.
