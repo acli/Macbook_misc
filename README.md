@@ -1,5 +1,7 @@
 This is a collection of random mini utilities that are only related
-in their connection to my pursuit of triple-beep prevention.
+in their connection to my pursuit of
+[triple-beep](http://www.google.com.tw/search?hl=en&biw=1400&bih=889&q=macbook+three+beeps+freeze)
+prevention.
 
 Fan and temperature control
 ===========================
