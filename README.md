@@ -58,7 +58,9 @@ Only some sensors, specifically temperature and fan speed,
 are known to work.
 
 This is the first of the three to be written
-and has been based on information gathered from a number of web pages.
+and has been based on an old set of MRTG scripts I wrote years ago,
+heavily supplanted by information gathered from a number of web pages
+on making sense out of smc readings.
 
 Sleep and hibernation
 =====================
