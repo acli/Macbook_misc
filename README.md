@@ -9,7 +9,7 @@ fanspeedd
 This is daemon that is designed to be run from
 init(8),
 launchd(8)
-or [svscanboot](http://cr.yp.to/daemontools/svscanboot.html)
+or [svscanboot(8)](http://cr.yp.to/daemontools/svscanboot.html)
 that monitors the system temperature and dynamically adjusts the fan
 speed to prevent overheating.
 [smc(8)](https://github.com/hholtmann/smcFanControl/tree/master/smc-command)
