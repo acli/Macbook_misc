@@ -213,7 +213,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	       $ramp_down_countdown = $ramp_down_countdown_initial;
 	       log_info "Setting ramp-down countdown to $ramp_down_countdown";
 	    } else {
-	       $ramp_down_countdown -= 1;
+	       $ramp_down_countdown -= $time_delta;
 	       if ($ramp_down_countdown <= 0) {
 		  force_logging;
 		  log_info "Ramping down to $target";
