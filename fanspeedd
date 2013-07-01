@@ -178,6 +178,8 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    # Temperature higher than our setpoint. The machine is getting too hot.
    # This is critical.
 
+   my $need_to_emit_stabilize_msg = 0;
+
    if ($temp_high > $temp_setpoint) {
       # If we got too hot, forget about ramping down - it's too dangerous
       undef $ramp_down_countdown;
@@ -192,9 +194,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	    undef $last_wait;
 	 }
       } elsif ($fan_speed < $fan_speed_setpoint && $fan_speed_setpoint < $fan_speed_max) {
-	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
-	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
-	 $last_wait = $fan_speed_setpoint;
+	 $need_to_emit_stabilize_msg = 1;
       }
 
    # Temperature lower than our setpoint. The fan might be a bit too loud?
@@ -224,6 +224,9 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	    }
 	 }
       } elsif ($fan_speed > $fan_speed_setpoint) {
+	 $need_to_emit_stabilize_msg = 1;
+      }
+      if ($need_to_emit_stabilize_msg) {
 	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
 	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
 	 $last_wait = $fan_speed_setpoint;
