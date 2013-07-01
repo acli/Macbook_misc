@@ -41,12 +41,10 @@ that gets and sets the fan speed (by twiddling F0Tg and FS!).
 It only knows about the first fan, if your Mac has more than one.
 
 This is the second of the three to be written
-and has been based on information gathered from a number of web pages.
-There is, however, probably one insight:
-that (x >> 2)/64.0 is really the same thing as x/256.0;
-in other words, the integer part of the temperature reading
-is just the MSB of the 16-bit word,
-the fractional part being just the LSB divided by 256.
+and is really very simple,
+as this was based on mrtg-getinfo-sensors
+and the only thing that it does which mrtg-getinfo-sensors does not do
+is setting the fan speed.
 
 mrtg-getinfo-sensors
 --------------------
@@ -60,7 +58,15 @@ are known to work.
 This is the first of the three to be written
 and has been based on an old set of MRTG scripts I wrote years ago,
 heavily supplanted by information gathered from a number of web pages
-on making sense out of smc readings.
+on making sense out of smc readings
+(originally a simple wrapper reading out fan speeds,
+it became messy when I attempted to get temperature readings).
+
+One insight into the temperature decoding bit was probably
+that (x >> 2)/64.0 is really the same thing as x/256.0;
+in other words, the integer part of the temperature reading
+is just the MSB of the 16-bit word,
+the fractional part being just the LSB divided by 256.
 
 Sleep and hibernation
 =====================
