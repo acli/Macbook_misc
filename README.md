@@ -63,7 +63,12 @@ on making sense out of smc readings
 it became messy when I attempted to get temperature readings).
 
 One insight into the temperature decoding bit was probably
-that (x >> 2)/64.0 is really the same thing as x/256.0;
+that (x >> 2)/64.0
+(as mentioned in, say,
+[here](https://bitbucket.org/elventear/fan-control/src/213fffd400aee245e7db7b5e314497a94ee9dab3/smc.c?at=default)
+or
+[here](http://mrmekon.tumblr.com/post/18514303388/os-x-current-cpu-temperature-on-command-line))
+is really the same thing as x/256.0;
 in other words, the integer part of the temperature reading
 is just the MSB of the 16-bit word,
 the fractional part being just the LSB divided by 256.
