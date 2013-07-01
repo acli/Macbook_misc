@@ -1,23 +1,12 @@
 #!/usr/bin/perl
 # vi: sw=3 ai sm:
-# WARNING: THIS CODE DOES NOT WORK. DO NOT USE IT!!!
-
-# usage: mrtg-getinfo-sensors
-#
-# This script polls information from smc(8) and outputs the polled
-# information in a format usable by mrtg. It can also function as a required
-# file, in which case it will gather the data from sensors(1) but not output
-# anything to stdout.
 
 use strict;
 use integer;
 
 use Getopt::Long;
 
-use POSIX;
-use Unix::Uptime;
-
-use vars qw( @sensorsflags );
+use vars qw( $actual_p $target_p );
 use vars qw( $verbose_p );
 
 # See if we are being require'd from another perl5 program.
@@ -27,7 +16,8 @@ use vars qw( $verbose_p );
 my($package, $filename, $line, $subroutine, $hasargs, $wantargs) = caller(0);
 if (! defined $subroutine) {
    GetOptions(
-      'debug' => sub { @sensorsflags = qw(-c /etc/sensors.new) },
+      'actual' => \$actual_p,
+      'setpoint|target' => \$target_p,
       'verbose|v' => \$verbose_p,
    ) || exit(1);
 }
@@ -89,6 +79,7 @@ if (@ARGV == 0) {
    $ack = 1;
 } elsif (@ARGV == 1) {
    my $setpoint = $ARGV[0];
+   die "Nonsensical to set actual fan speed\n" if $actual_p;
    if ($setpoint !~ /^\d+$/) {
       die "Setpoint be a whole number\n";
    } elsif ($setpoint < 2000) {
@@ -100,9 +91,17 @@ if (@ARGV == 0) {
       write_sensor('F0Tg', 'sp78', $setpoint);
       $ack = $verbose_p;
    }
+} else {
+   die "Too many arguments\n";
 }
 if ($ack) {
    my $curr_speed = read_sensor('F0Ac');
    my $curr_setpoint = read_sensor('F0Tg');
-   printf "Fan speed: %d, setpoint: %d\n", $curr_speed, $curr_setpoint;
+   if ((!$actual_p && !$target_p) || ($actual_p && $target_p)) {
+      printf "Fan speed: %d, setpoint: %d\n", $curr_speed, $curr_setpoint;
+   } elsif ($actual_p) {
+      printf "%d\n", $curr_speed;
+   } elsif ($target_p) {
+      printf "%d\n", $curr_setpoint;
+   }
 }
