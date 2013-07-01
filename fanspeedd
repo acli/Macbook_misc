@@ -29,7 +29,6 @@ my $temp_setpoint = 55;
 my $temp_epsilon = 1;
 my $time_delta = 1;
 my $ramp_down_countdown_initial = 15;
-my $ramp_down_countdown;
 my $ramp_down_rapidity_threshold = 3500;
 my $log_interval = 15;
 
@@ -146,6 +145,7 @@ sub target_fan_speed (;$) {
 ################################################################################
 
 my $fan_speed_setpoint = target_fan_speed;
+my $ramp_down_countdown;
 force_logging;
 log_info "Temperature setpoint %d deg C, current fan speed setpoint %d", $temp_setpoint, $fan_speed_setpoint;
 target_fan_speed $fan_speed_setpoint; # in case FS! has not been set
