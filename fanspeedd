@@ -181,7 +181,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    my $need_to_emit_stabilize_msg = 0;
 
    if ($temp_high > $temp_setpoint) {
-      # If we got too hot, forget about ramping down - it's too dangerous
+      # If we got too hot, forget about ramping down - that's too dangerous
       undef $ramp_down_countdown;
       if ($fan_speed > $fan_speed_setpoint) { # set point too low
 	 my $delta = ($fan_speed_max - $fan_speed_setpoint)/3;
@@ -198,7 +198,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
       }
 
    # Temperature lower than our setpoint. The fan might be a bit too loud?
-   # Maybe. Hot is dangerous, so ramping down the fan is a very low priority.
+   # But hot is dangerous, so ramping down the fan is a very low priority.
 
    } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
       if ($fan_speed > $fan_speed_setpoint) { # set point too high, maybe
