@@ -1,0 +1,17 @@
+#!/bin/sh
+
+SLEEP=0
+
+hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
+echo "Temporarily switching hibernate mode from $hibernatemode to $SLEEP..."
+pmset -a hibernatemode $SLEEP force
+
+echo "Syncing disks..."
+sync; sync; sync
+sleep 1
+
+echo "Going to sleep..."
+pmset sleepnow
+
+echo "Restoring hibernation mode to $hibernatemode"
+pmset -a hibernatemode "$hibernatemode"

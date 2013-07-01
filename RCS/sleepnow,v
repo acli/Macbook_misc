@@ -1,0 +1,58 @@
+head	1.2;
+access;
+symbols;
+locks
+	root:1.2; strict;
+comment	@# @;
+
+
+1.2
+date	2013.06.28.18.37.30;	author root;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2013.06.28.18.24.03;	author root;	state Exp;
+branches;
+next	;
+
+
+desc
+@put the computer into plain sleep mode (no fallback hibernation)
+@
+
+
+1.2
+log
+@use "force" option
+http://superuser.com/questions/59188/does-mac-os-x-support-hibernation
+@
+text
+@#!/bin/sh
+
+hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
+echo "Hibernate mode was $hibernatemode, temporarily switching to mode 0..."
+pmset -a hibernatemode 0 force
+
+echo "Syncing disks..."
+sync
+sleep 1
+
+echo "Going to sleep..."
+pmset sleepnow
+
+echo "Restoring hibernation mode to $hibernatemode"
+pmset -a hibernatemode "$hibernatemode"
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d4 2
+a5 2
+echo "Hibernate mode was $hibernatemode, switching to mode 0..."
+pmset -a hibernatemode 0
+@

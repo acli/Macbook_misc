@@ -1,6 +1,7 @@
-install: /usr/local/sbin/fanspeedd
-
-/usr/local/sbin/fanspeedd: fanspeedd
+install: /usr/local/sbin/fanspeedd \
+	/usr/local/sbin/fanspeed \
+	/usr/local/sbin/hibernate \
+	/usr/local/sbin/sleepnow \
 
 /usr/local/sbin/%: %
 	install -m 755 -o 0 -g 0 $< $@
