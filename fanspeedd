@@ -201,7 +201,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    # Maybe. Hot is dangerous, so ramping down the fan is a very low priority.
 
    } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
-      if ($fan_speed > $fan_speed_setpoint) { # set point too low
+      if ($fan_speed > $fan_speed_setpoint) { # set point too high, maybe
 	 my $midpoint = $fan_speed_min + ($fan_speed_max - $fan_speed_min)/2;
 	 my $delta = ($fan_speed_setpoint - $midpoint)/16;
 	 $delta = 1 if $delta < 1 || $fan_speed_setpoint < $midpoint;
