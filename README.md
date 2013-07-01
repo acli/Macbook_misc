@@ -27,7 +27,11 @@ temperature drops quickly.
 
 This has only been known to run on my Macbook and has yet to be
 conclusively proven
-that it actually does its job of preventing triple beep situations. YMMV.
+that it actually does its job of preventing triple beep situations.
+It also only knows how to manipulate one fan.
+So YMMV.
+
+This code descended directly from mrtg-get-sensors and fanspeed.
 
 fanspeed
 --------
@@ -35,6 +39,14 @@ This is a wrapper to
 [smc(8)](https://github.com/hholtmann/smcFanControl/tree/master/smc-command)
 that gets and sets the fan speed (by twiddling F0Tg and FS!).
 It only knows about the first fan, if your Mac has more than one.
+
+This is the second of the three to be written
+and has been based on information gathered from a number of web pages.
+There is, however, probably one insight:
+that (x >> 2)/64.0 is really the same thing as x/256.0;
+in other words, the integer part of the temperature reading
+is just the MSB of the 16-bit word,
+the fractional part being just the LSB divided by 256.
 
 mrtg-getinfo-sensors
 --------------------
@@ -45,8 +57,11 @@ for getting sensor readings for
 Only some sensors, specifically temperature and fan speed,
 are known to work.
 
-Sleep and hibernation control
-=============================
+This is the first of the three to be written
+and has been based on information gathered from a number of web pages.
+
+Sleep and hibernation
+=====================
 
 hibernate
 ---------
