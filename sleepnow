@@ -1,6 +1,10 @@
 #!/bin/sh
 
+PATH="$PATH:/usr/local/sbin"
 SLEEP=0
+
+fanspeed="`fanspeed --target`"
+fanspeed 6200
 
 hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 echo "Temporarily switching hibernate mode from $hibernatemode to $SLEEP..."
@@ -13,5 +17,14 @@ sleep 1
 echo "Going to sleep..."
 pmset sleepnow
 
-echo "Restoring hibernation mode to $hibernatemode"
-pmset -a hibernatemode "$hibernatemode"
+hibernatemode_chk="`pmset -g|grep hibernatemode|awk '{print $2}'`"
+if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
+	echo "Restoring hibernation mode to $hibernatemode"
+	pmset -a hibernatemode "$hibernatemode"
+fi
+
+fanspeed_chk="`fanspeed --target`"
+if [ "x$fanspeed_chk" != "x$fanspeed" ]; then
+	echo "Restoring fan speed to $fanspeed"
+	fanspeed $fanspeed
+fi
