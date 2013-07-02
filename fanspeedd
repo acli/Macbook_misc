@@ -194,7 +194,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 
    # Calculate penalty for ramp-down
 
-   my $penalty = ($temp_ambient - $ambient_threshold)/2;
+   my $penalty = ($temp_ambient - $ambient_threshold + 1)/2;
    $penalty = 0 if $penalty < 0;
    $penalty += 1 if $avg_1min > $temp_setpoint;
    $penalty += 1 if $avg_5min > $temp_setpoint;
