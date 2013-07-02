@@ -26,7 +26,7 @@ my @sensors = qw(
 my $fan_speed_min = 2500;
 my $fan_speed_max = 6200;
 my $ambient_threshold = 30;
-my $temp_setpoint = 52;		# beyond this is our definition of "too hot"
+my $temp_setpoint = 54;		# beyond this is our definition of "too hot"
 my $time_delta = 2;		# poll interval
 my $ramp_down_countdown_initial = 15;
 my $ramp_down_delta_min = 25;
@@ -220,7 +220,7 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    # This is critical.
 
    my $need_to_emit_stabilize_msg = 0;
-   my $penalty = $temp_ambient - $ambient_threshold;
+   my $penalty = ($temp_ambient - $ambient_threshold)/3;
    $penalty = 0 if $penalty < 0;
 
    if ($temp_high + $penalty > $temp_setpoint) {
