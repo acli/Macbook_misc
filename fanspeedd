@@ -265,6 +265,8 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	 }
       }
       my $target = $fan_speed_setpoint - $delta;
+      # http://forums.macrumors.com/archive/index.php/index/t-1324246.html
+      $target = 5000 if $target < 5000 && $temp_high >= 50;
       if ($target >= $fan_speed_min) {
 	 if (!defined $ramp_down_countdown) {
 	    # Monitor the situation for a while before we believe we really
