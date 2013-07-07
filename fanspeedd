@@ -225,12 +225,15 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
       $fan_speed_setpoint = $actual_setpoint;
    }
 
-   # Temperature higher than our setpoint. The machine is getting too hot.
-   # This is critical.
+   # Stage one of temperature/fan speed check. Check the temperature against
+   # our set point to determine our target fan speed.
 
    my $det = $temp_high + $penalty;
    my $need_to_emit_stabilize_msg = 0;
+   my $target_fan_speed;
 
+   # Temperature higher than our setpoint. The machine is getting too hot.
+   # This is critical.
    if ($det > $temp_setpoint) {
       # If we got too hot, forget about ramping down - that's too dangerous
       undef $ramp_down_countdown;
@@ -238,20 +241,14 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	 my $delta = ($fan_speed_max - $fan_speed_setpoint)/3;
 	 $delta = $ramp_up_delta_min if $delta < $ramp_up_delta_min && $fan_speed_setpoint + $ramp_up_delta_min <= $fan_speed_max;
 	 $delta = 1 if $delta < 1;
-	 my $target = $fan_speed_setpoint + $delta;
-	 if ($target <= $fan_speed_max) {
-	    force_logging;
-	    log_info "Ramping up to $target\n";
-	    $fan_speed_setpoint = target_fan_speed($target);
-	    undef $last_wait;
-	 }
+	 $target_fan_speed = $fan_speed_setpoint + $delta;
+	 $target_fan_speed = $fan_speed_max if $target_fan_speed > $fan_speed_max;
       } elsif ($fan_speed < $fan_speed_setpoint && $fan_speed_setpoint < $fan_speed_max) {
 	 $need_to_emit_stabilize_msg = 1;
       }
 
-   # Temperature lower than our setpoint. The fan might be a bit too loud?
-   # But hot is dangerous, so ramping down the fan is a very low priority.
-
+   # Temperature lower than our setpoint, but might still be higher than our
+   # target temperature curve (if we can call it that)
    } elsif ($det < $temp_setpoint) { # too cool? maybe? :-P
       my $delta = 15*($temp_setpoint - $avg_1min)
 		+  5*($temp_setpoint - $avg_5min)
@@ -264,13 +261,28 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	    $delta = $ramp_down_delta_min;
 	 }
       }
-      my $target = $fan_speed_setpoint - $delta;
+      $target_fan_speed = $fan_speed_setpoint - $delta;
       # http://forums.macrumors.com/archive/index.php/index/t-1324246.html
-      $target = 5000 if $target < 5000 && $temp_high >= 50;
-      if ($target > $temp_setpoint) {
-	 # FIXME supposed to be ramping down, but we're ramping up instead
-	 ;
-      } elsif ($target >= $fan_speed_min) {
+      $target_fan_speed = 5000 if $target_fan_speed < 5000 && $temp_high >= 50;
+   }
+
+   # Stage two of temperature/fan speed check. Check the fan speed against
+   # our target to determine if we are ramping up or down
+
+   if (!defined $target_fan_speed || $target_fan_speed == $fan_speed_setpoint) {
+      ;
+
+   # Ramp up immediately if it looks like we need to
+   } elsif ($target_fan_speed > $fan_speed_setpoint) {
+      force_logging;
+      log_info "Ramping up to $target_fan_speed\n";
+      $fan_speed_setpoint = target_fan_speed($target_fan_speed);
+      undef $last_wait;
+
+   # Ramping down is kind of a lower priority since it's kind of dangerous.
+   } elsif ($target_fan_speed < $fan_speed_setpoint) {
+
+      if ($target_fan_speed >= $fan_speed_min) {
 	 if (!defined $ramp_down_countdown) {
 	    # Monitor the situation for a while before we believe we really
 	    # are probably too cool and maybe we should ramp down the fan.
@@ -280,19 +292,20 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 	    $ramp_down_countdown -= $time_delta;
 	    if ($ramp_down_countdown <= 0) {
 	       force_logging;
-	       log_info "Ramping down to $target";
-	       $fan_speed_setpoint = target_fan_speed($target);
+	       log_info "Ramping down to $target_fan_speed";
+	       $fan_speed_setpoint = target_fan_speed($target_fan_speed);
 	       @temp_history_short = ();
 	       undef $last_wait;
 	       undef $ramp_down_countdown;
 	    }
 	 }
       }
-      if ($need_to_emit_stabilize_msg) {
-	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
-	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
-	 $last_wait = $fan_speed_setpoint;
-      }
+   }
+
+   if ($need_to_emit_stabilize_msg) {
+      log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
+	    unless defined $last_wait && $fan_speed_setpoint == $last_wait;
+      $last_wait = $fan_speed_setpoint;
    }
 
    unforce_logging;
