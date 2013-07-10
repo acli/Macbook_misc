@@ -74,6 +74,8 @@ sub log_write {
 sub handler {
    my($sig) = @_;
    log_info "Caught a SIG$sig, shutting down\n";
+   $fan_speed_max = 6200 unless defined $fan_speed_max;
+   target_fan_speed($fan_speed_max) if $sig eq 'TERM';
    exit(1);
 }
 $SIG{'HUP'} = sub { exec { $0 } $0 };
