@@ -23,7 +23,7 @@ my @sensors = qw(
       TA0P TB0T TB1T  TB2T TCGC TCSA  TCTD TCXC TC0E
       TC0F TC0J TC0P  TC1C TC2C TG1D  TM0P TM0S TPCD
    );
-my $fan_speed_min = 2500;
+my $fan_speed_min = 4000;	# normally 2500;
 my $fan_speed_max = 6200;
 my $ambient_threshold = 33;
 my $temp_setpoint = 54;		# beyond this is our definition of "too hot"
