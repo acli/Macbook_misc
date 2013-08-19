@@ -8,14 +8,26 @@ fanspeed 6200
 
 hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 echo "Temporarily switching hibernate mode from $hibernatemode to $SLEEP..."
-pmset -a hibernatemode $SLEEP force
+pmset -a hibernatemode $SLEEP
+pmset -a lidwake 0
 
 echo "Syncing disks..."
 sync; sync; sync
-sleep 1
+sleep 5
 
-echo "Going to sleep..."
+echo "Going into sleep..."
+pmset -a standby 5
+pmset -a hibernatemode $SLEEP force
+pmset -a lidwake 0 force
 pmset sleepnow
+
+# pmset sleepnow will immediately return before the system goes to sleep
+# so we must insert a delay here to compensate
+# Otherwise we will change the hibernate mode back before the system even
+# goes into sleep.
+
+echo Wait...
+sleep 5
 
 hibernatemode_chk="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
