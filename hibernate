@@ -9,6 +9,7 @@ fanspeed 6200
 hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 echo "Temporarily switching hibernate mode from $hibernatemode to $HIBERNATE..."
 pmset -a hibernatemode $HIBERNATE
+pmset -a lidwake 0
 
 echo "Syncing disks..."
 sync; sync; sync
@@ -17,6 +18,7 @@ sleep 5
 echo "Going into hibernation..."
 pmset -a standby 5
 pmset -a hibernatemode $HIBERNATE force
+pmset -a lidwake 0 force
 pmset sleepnow
 
 # pmset sleepnow will immediately return before the system goes to hibernation
