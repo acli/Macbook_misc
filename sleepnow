@@ -12,6 +12,7 @@ pmset -a hibernatemode $SLEEP
 
 # Make sure we don't wake the Mac by accident. The acwake parameter is
 # especially dangerous, but so is lidwake if what the Apple techs say is true.
+# Alas, the Power Manager does not seem to actually honour these values :-/
 pmset -a lidwake 0
 pmset -a acwake 0
 
