@@ -20,9 +20,10 @@ echo "Syncing disks..."
 sync; sync; sync
 sleep 5
 
+# Apparently, standby must be 0 for lidwake and acwake to work (?!)
 echo "Going into hibernation..."
-pmset -a standby 5
 pmset -a hibernatemode $HIBERNATE force
+pmset -a standby 0
 pmset -a lidwake 0 force
 pmset -a acwake 0 force
 pmset sleepnow
