@@ -34,7 +34,7 @@ pmset sleepnow
 # goes into sleep.
 
 echo Wait...
-sleep 5
+sleep 30
 
 hibernatemode_chk="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
