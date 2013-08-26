@@ -3,18 +3,20 @@
 PATH="$PATH:/usr/local/sbin"
 HIBERNATE=25
 
+# Make sure we don't wake the Mac by accident. The acwake parameter is
+# especially dangerous, but so is lidwake if what the Apple techs say is true.
+# Alas, the Power Manager does not seem to actually honour these values :-/
+# And do this before we touch the fan speed, so if this fails we don't
+# rack up the fan speed unnecessarily.
+pmset -a lidwake 0 || exit $?
+pmset -a acwake 0 || exit $?
+
 fanspeed="`fanspeed --target`"
 fanspeed 6200
 
 hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 echo "Temporarily switching hibernate mode from $hibernatemode to $HIBERNATE..."
 pmset -a hibernatemode $HIBERNATE || exit $?
-
-# Make sure we don't wake the Mac by accident. The acwake parameter is
-# especially dangerous, but so is lidwake if what the Apple techs say is true.
-# Alas, the Power Manager does not seem to actually honour these values :-/
-pmset -a lidwake 0
-pmset -a acwake 0
 
 echo "Syncing disks..."
 sync; sync; sync
