@@ -8,7 +8,7 @@ fanspeed 6200
 
 hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 echo "Temporarily switching hibernate mode from $hibernatemode to $SLEEP..."
-pmset -a hibernatemode $SLEEP
+pmset -a hibernatemode $SLEEP || exit $?
 
 # Make sure we don't wake the Mac by accident. The acwake parameter is
 # especially dangerous, but so is lidwake if what the Apple techs say is true.
