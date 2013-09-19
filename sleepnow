@@ -8,15 +8,15 @@ SLEEP=0
 # Alas, the Power Manager does not seem to actually honour these values :-/
 # And do this before we touch the fan speed, so if this fails we don't
 # rack up the fan speed unnecessarily.
-pmset -a lidwake 0 || exit $?
-pmset -a acwake 0 || exit $?
+pmset -a lidwake 0 force || exit $?
+pmset -a acwake 0 force || exit $?
 
 fanspeed="`fanspeed --target`"
 fanspeed 6200
 
 hibernatemode="`pmset -g|grep hibernatemode|awk '{print $2}'`"
 echo "Temporarily switching hibernate mode from $hibernatemode to $SLEEP..."
-pmset -a hibernatemode $SLEEP || exit $?
+pmset -a hibernatemode $SLEEP force || exit $?
 
 echo "Syncing disks..."
 sync; sync; sync
@@ -25,7 +25,7 @@ sleep 5
 # Apparently, standby must be 0 for lidwake and acwake to work (?!)
 echo "Going into sleep..."
 pmset -a hibernatemode $SLEEP force
-pmset -a standby 0
+pmset -a standby 0 force
 pmset -a lidwake 0 force
 pmset -a acwake 0 force
 pmset sleepnow
@@ -39,10 +39,10 @@ echo Wait...
 sleep 30
 
 hibernatemode_chk="`pmset -g|grep hibernatemode|awk '{print $2}'`"
-if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
-	echo "Restoring hibernation mode to $hibernatemode"
-	pmset -a hibernatemode "$hibernatemode"
-fi
+#if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
+#	echo "Restoring hibernation mode to $hibernatemode"
+#	pmset -a hibernatemode "$hibernatemode"
+#fi
 
 fanspeed_chk="`fanspeed --target`"
 if [ "x$fanspeed_chk" != "x$fanspeed" ]; then
