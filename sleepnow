@@ -2,14 +2,23 @@
 
 PATH="$PATH:/usr/local/sbin"
 SLEEP=0
+FORCE_ONLY=false
+
+if $FORCE_ONLY; then
+	FORCE=force
+else
+	FORCE=
+fi
 
 # Make sure we don't wake the Mac by accident. The acwake parameter is
 # especially dangerous, but so is lidwake if what the Apple techs say is true.
 # Alas, the Power Manager does not seem to actually honour these values :-/
 # And do this before we touch the fan speed, so if this fails we don't
 # rack up the fan speed unnecessarily.
-pmset -a lidwake 0 force || exit $?
-pmset -a acwake 0 force || exit $?
+# Apparently, standby must be 0 for lidwake and acwake to work (?!)
+pmset -a standby 0 $FORCE || exit $?
+pmset -a lidwake 0 $FORCE || exit $?
+pmset -a acwake 0 $FORCE || exit $?
 
 fanspeed="`fanspeed --target`"
 fanspeed 6200
@@ -39,10 +48,10 @@ echo Wait...
 sleep 30
 
 hibernatemode_chk="`pmset -g|grep hibernatemode|awk '{print $2}'`"
-#if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
-#	echo "Restoring hibernation mode to $hibernatemode"
-#	pmset -a hibernatemode "$hibernatemode"
-#fi
+if [ "x$hibernatemode_chk" != "x$hibernatemode" ]; then
+	echo "Restoring hibernation mode to $hibernatemode"
+	pmset -a hibernatemode "$hibernatemode" $FORCE
+fi
 
 fanspeed_chk="`fanspeed --target`"
 if [ "x$fanspeed_chk" != "x$fanspeed" ]; then
