@@ -29,8 +29,8 @@ my $ambient_threshold = 40;
 my $temp_setpoint = 70;		# beyond this is our definition of "too hot"
 my $time_delta = 2;		# poll interval
 my $ramp_down_countdown_initial = 45;
-my $ramp_down_delta_min = 25;
-my $ramp_up_delta_min = 50;
+my $ramp_down_delta_min = 15;
+my $ramp_up_delta_min = 40;
 my $log_interval = 15;
 
 ###############################################################################
