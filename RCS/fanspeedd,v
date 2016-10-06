@@ -1,9 +1,15 @@
-head	1.23;
+head	1.24;
 access;
 symbols;
-locks; strict;
+locks
+	root:1.24; strict;
 comment	@# @;
 
+
+1.24
+date	2015.02.25.05.30.45;	author root;	state Exp;
+branches;
+next	1.23;
 
 1.23
 date	2013.06.30.22.08.19;	author root;	state Exp;
@@ -126,9 +132,9 @@ desc
 @
 
 
-1.23
+1.24
 log
-@Cull some duplicate "Waitinf for fan to stabilize" messages
+@Various fixes. Not sure why these were not checked in.
 @
 text
 @#!/usr/bin/perl
@@ -157,12 +163,13 @@ my @@sensors = qw(
       TC0F TC0J TC0P  TC1C TC2C TG1D  TM0P TM0S TPCD
    );
 my $fan_speed_min = 2500;
-my $fan_speed_max = 6200;
-my $temp_setpoint = 55;
-my $temp_epsilon = 1;
-my $time_delta = 1;
-my $ramp_down_countdown_initial = 15;
-my $ramp_down_countdown;
+my $fan_speed_max = 5750; # was: 5000; max: 6200
+my $ambient_threshold = 40;
+my $temp_setpoint = 60;		# beyond this is our definition of "too hot"
+my $time_delta = 2;		# poll interval
+my $ramp_down_countdown_initial = 45;
+my $ramp_down_delta_min = 15;
+my $ramp_up_delta_min = 40;
 my $log_interval = 15;
 
 ###############################################################################
@@ -206,6 +213,8 @@ sub log_write {
 sub handler {
    my($sig) = @@_;
    log_info "Caught a SIG$sig, shutting down\n";
+   $fan_speed_max = 6200 unless defined $fan_speed_max;
+   target_fan_speed($fan_speed_max) if $sig eq 'TERM';
    exit(1);
 }
 $SIG{'HUP'} = sub { exec { $0 } $0 };
@@ -269,8 +278,8 @@ sub target_fan_speed (;$) {
    if (!defined $speed) {
       $speed = read_sensor('F0Tg');
    } else {
-      write_sensor('FS! ', 'ui16', 1);
-      write_sensor('F0Tg', 'sp78', $speed);
+      write_sensor('FS! ', 'ui16', 1) unless read_sensor('FS! ') == 1;
+      write_sensor('F0Tg', 'sp78', $speed) unless read_sensor('F0Tg') == $speed;
    }
    return $speed;
 }
@@ -278,24 +287,72 @@ sub target_fan_speed (;$) {
 ################################################################################
 
 my $fan_speed_setpoint = target_fan_speed;
+my $ramp_down_countdown;
+my @@temp_history_short;
+my @@temp_history_long;
+
 force_logging;
 log_info "Temperature setpoint %d deg C, current fan speed setpoint %d", $temp_setpoint, $fan_speed_setpoint;
 target_fan_speed $fan_speed_setpoint; # in case FS! has not been set
 for (my($last_temp_high, $last_setpoint, $last_wait);;) {
    my @@temp = map { read_sensor($_) } @@sensors;
    my $temp_high = (sort {$b <=> $a} @@temp)[0];
+   my $temp_ambient = read_sensor 'TA0P';
    my $fan_speed = read_sensor('F0Ac');
 
-   # Periodic logging - don't log too often or the disk will not spin down
+   # Keep track of previous temperature readings
+
+   unshift @@temp_history_short, $temp_high;
+   unshift @@temp_history_long, $temp_high;
+   splice @@temp_history_short, (900/$time_delta + 1);
+   splice @@temp_history_long, (900/$time_delta + 1);
+
+   # Calculate averages
+
+   my($avg_1min, $avg_5min, $avg_15min);
+   do {
+      my @@avg = (
+	    [\@@temp_history_short, 60, 0, 0],
+	    [\@@temp_history_short, 300, 0, 0],
+	    [\@@temp_history_short, 900, 0, 0]
+	 );
+      for (my $j = 0; $j < @@avg; $j += 1) {
+	 for (my $i = 0; $i < scalar @@{$avg[$j]->[0]}; $i += 1) {
+	    my $temp = $avg[$j]->[0]->[$i];
+	    my $t = $i * $time_delta;
+	    no integer;
+	    if ($t < $avg[$j]->[1]) {
+	       $avg[$j]->[2] += 1;
+	       $avg[$j]->[3] += $temp;
+	    }
+	 }
+      }
+      no integer;
+      $avg_1min = $avg[0]->[3] / $avg[0]->[2];
+      $avg_5min = $avg[1]->[3] / $avg[1]->[2];
+      $avg_15min = $avg[2]->[3] / $avg[2]->[2];
+   };
+
+   # Calculate penalty for ramp-down
+
+   my $penalty = ($temp_ambient - $ambient_threshold + 1)/2;
+   $penalty = 0 if $penalty < 0;
+   $penalty += 1 if $avg_1min > $temp_setpoint;
+   $penalty += 1 if $avg_5min > $temp_setpoint;
+   $penalty += 1 if $avg_15min > $temp_setpoint;
+
+   # Periodic logging
 
    force_logging if (time % $log_interval) == 0 || $temp_high > $temp_setpoint;
-   my $fmt_periodic = '%ddegC(hi)';
-   $fmt_periodic .= ($verbose_p > 1)? ', %drpm': '%0.0s';
+   my $fmt_periodic = 'Temp %.1f(+%d) amb %.1f avg %.1f, %.1f, %.1f';
+   $fmt_periodic .= ($verbose_p > 1)? ', %d rpm': '%0.0s';
    $fmt_periodic .= ' @@%d';
    if ($verbose_p > 1 || ($temp_high != $last_temp_high)
 		      || ($fan_speed_setpoint != $last_setpoint)) {
 
-      log_info $fmt_periodic, $temp_high, $fan_speed, $fan_speed_setpoint;
+      log_info $fmt_periodic, $temp_high, $penalty, $temp_ambient,
+	    $avg_1min, $avg_5min, $avg_15min,
+	    $fan_speed, $fan_speed_setpoint;
       $last_temp_high = $temp_high;
       $last_setpoint = $fan_speed_setpoint;
    }
@@ -304,35 +361,158 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 
    my $actual_setpoint = target_fan_speed;
    if ($actual_setpoint != $fan_speed_setpoint) {
+      force_logging;
       log_info "Setpoint changed to %d by an external agent", $actual_setpoint;
       $fan_speed_setpoint = $actual_setpoint;
    }
 
+   # Stage one of temperature/fan speed check. Check the temperature against
+   # our set point to determine our target fan speed.
+
+   my $det = $temp_high + $penalty;
+   my $need_to_emit_stabilize_msg = 0;
+   my $target_fan_speed;
+
    # Temperature higher than our setpoint. The machine is getting too hot.
    # This is critical.
-
-   if ($temp_high > $temp_setpoint) {
-      # If we got too hot, forget about ramping down - it's too dangerous
+   if ($det > $temp_setpoint) {
+      # If we got too hot, forget about ramping down - that's too dangerous
       undef $ramp_down_countdown;
       if ($fan_speed > $fan_speed_setpoint) { # set point too low
 	 my $delta = ($fan_speed_max - $fan_speed_setpoint)/3;
+	 $delta = $ramp_up_delta_min if $delta < $ramp_up_delta_min && $fan_speed_setpoint + $ramp_up_delta_min <= $fan_speed_max;
 	 $delta = 1 if $delta < 1;
+	 $target_fan_speed = $fan_speed_setpoint + $delta;
+	 $target_fan_speed = $fan_speed_max if $target_fan_speed > $fan_speed_max;
+      } elsif ($fan_speed < $fan_speed_setpoint && $fan_speed_setpoint < $fan_speed_max) {
+	 $need_to_emit_stabilize_msg = 1;
+      }
+
+   # Temperature lower than our setpoint, but might still be higher than our
+   # target temperature curve (if we can call it that)
+   } elsif ($det < $temp_setpoint) { # too cool? maybe? :-P
+      my $delta = 15*($temp_setpoint - $avg_1min)
+		+  5*($temp_setpoint - $avg_5min)
+		+  1*($temp_setpoint - $avg_15min)
+		+  5*($temp_high - $avg_5min);
+
+      if ($delta < 1 || $delta < $ramp_down_delta_min) {
+	 $delta = 1;
+	 if ($fan_speed_setpoint - $ramp_down_delta_min >= $fan_speed_min) {
+	    $delta = $ramp_down_delta_min;
+	 }
+      }
+      $target_fan_speed = $fan_speed_setpoint - $delta;
+      # http://forums.macrumors.com/archive/index.php/index/t-1324246.html
+      $target_fan_speed = 5000 if $target_fan_speed < 5000 && $temp_high >= 50;
+   }
+
+   # Stage two of temperature/fan speed check. Check the fan speed against
+   # our target to determine if we are ramping up or down
+
+   if (!defined $target_fan_speed || $target_fan_speed == $fan_speed_setpoint) {
+      ;
+
+   # Ramp up immediately if it looks like we need to
+   } elsif ($target_fan_speed > $fan_speed_setpoint) {
+      force_logging;
+      log_info "Ramping up to $target_fan_speed\n";
+      $fan_speed_setpoint = target_fan_speed($target_fan_speed);
+      undef $last_wait;
+
+   # Ramping down is kind of a lower priority since it's kind of dangerous.
+   } elsif ($target_fan_speed < $fan_speed_setpoint) {
+
+      if ($target_fan_speed >= $fan_speed_min) {
+	 if (!defined $ramp_down_countdown) {
+	    # Monitor the situation for a while before we believe we really
+	    # are probably too cool and maybe we should ramp down the fan.
+	    $ramp_down_countdown = $ramp_down_countdown_initial;
+	    log_info "Setting ramp-down countdown to $ramp_down_countdown";
+	 } else {
+	    $ramp_down_countdown -= $time_delta;
+	    if ($ramp_down_countdown <= 0) {
+	       force_logging;
+	       log_info "Ramping down to $target_fan_speed";
+	       $fan_speed_setpoint = target_fan_speed($target_fan_speed);
+	       @@temp_history_short = ();
+	       undef $last_wait;
+	       undef $ramp_down_countdown;
+	    }
+	 }
+      }
+   }
+
+   if ($need_to_emit_stabilize_msg) {
+      log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
+	    unless defined $last_wait && $fan_speed_setpoint == $last_wait;
+      $last_wait = $fan_speed_setpoint;
+   }
+
+   unforce_logging;
+   sleep($time_delta);
+}
+@
+
+
+1.23
+log
+@Cull some duplicate "Waitinf for fan to stabilize" messages
+@
+text
+@d27 7
+a33 6
+my $fan_speed_max = 6200;
+my $temp_setpoint = 55;
+my $temp_epsilon = 1;
+my $time_delta = 1;
+my $ramp_down_countdown_initial = 15;
+my $ramp_down_countdown;
+d77 2
+d142 2
+a143 2
+      write_sensor('FS! ', 'ui16', 1);
+      write_sensor('F0Tg', 'sp78', $speed);
+d151 4
+d161 1
+d164 42
+a205 1
+   # Periodic logging - don't log too often or the disk will not spin down
+d208 2
+a209 2
+   my $fmt_periodic = '%ddegC(hi)';
+   $fmt_periodic .= ($verbose_p > 1)? ', %drpm': '%0.0s';
+d214 3
+a216 1
+      log_info $fmt_periodic, $temp_high, $fan_speed, $fan_speed_setpoint;
+d225 1
+d230 7
+d239 2
+a240 3
+
+   if ($temp_high > $temp_setpoint) {
+      # If we got too hot, forget about ramping down - it's too dangerous
+d244 1
+d246 18
+a263 6
 	 my $target = $fan_speed_setpoint + $delta;
 	 if ($target <= $fan_speed_max) {
 	    force_logging;
 	    log_info "Ramping up to $target\n";
 	    $fan_speed_setpoint = target_fan_speed($target);
 	    undef $last_wait;
-	 }
+a264 4
       } elsif ($fan_speed < $fan_speed_setpoint && $fan_speed_setpoint < $fan_speed_max) {
 	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
 	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
 	 $last_wait = $fan_speed_setpoint;
-      }
-
+d266 7
+d274 2
+a275 2
    # Temperature lower than our setpoint. The fan might be a bit too loud?
    # Maybe. Hot is dangerous, so ramping down the fan is a very low priority.
-
+d277 25
+a301 21
    } elsif ($temp_high < $temp_setpoint) { # too cool? maybe? :-P
       if ($fan_speed > $fan_speed_setpoint) { # set point too low
 	 my $midpoint = $fan_speed_min + ($fan_speed_max - $fan_speed_min)/2;
@@ -354,18 +534,12 @@ for (my($last_temp_high, $last_setpoint, $last_wait);;) {
 		  undef $last_wait;
 		  undef $ramp_down_countdown;
 	       }
-	    }
-	 }
+a303 4
       } elsif ($fan_speed > $fan_speed_setpoint) {
 	 log_info "Waiting for fan to stabilize at $fan_speed_setpoint\n"
 	       unless defined $last_wait && $fan_speed_setpoint == $last_wait;
 	 $last_wait = $fan_speed_setpoint;
-      }
-   }
-
-   unforce_logging;
-   sleep($time_delta);
-}
+d307 6
 @
 
 
