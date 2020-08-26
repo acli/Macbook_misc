@@ -24,9 +24,9 @@ my @sensors = qw(
       TC0F TC0J TC0P  TC1C TC2C TG1D  TM0P TM0S TPCD
    );
 my $fan_speed_min = 2500;
-my $fan_speed_max = 5750; # was: 5000; max: 6200
+my $fan_speed_max = 5500; # was: 5000; max: 6200
 my $ambient_threshold = 40;
-my $temp_setpoint = 60;		# beyond this is our definition of "too hot"
+my $temp_setpoint = 75;		# beyond this is our definition of "too hot" (was: 60)
 my $time_delta = 2;		# poll interval
 my $ramp_down_countdown_initial = 45;
 my $ramp_down_delta_min = 15;
