@@ -1,0 +1,52 @@
+#!/usr/bin/perl
+# vi: set sw=3 ai sm:
+
+# Copyright 2021 Ambrose Li
+# This is a script to run makewhatis. Eventually, this script will generate the
+# whatis files itself, because MacOSX's makewhatis(8) command is extremely buggy
+# to the point that it's useless: Apple's makewhatis cannot even handle some of
+# its own man pages, such as afplay.1
+
+use strict;
+use integer;
+
+use Getopt::Long;
+
+use vars qw( $append_p $indent $name $output $verbose_p $localized_p $dry_run_p );
+
+sub show_cmd (\@;$) {
+   my($cmd, $dry_run_p) = @_;
+   printf STDERR '%s: %s', (defined $dry_run_p && $dry_run_p? 'pretending to run': 'running'), join(' ', map { /'/? (/"/? eval {
+	    s/"/\\"/;
+	    "\"$_\"";
+	 }: "\"$_\""): /\s/? "'$_'": $_ } @$cmd) if $verbose_p;
+}
+
+sub makewhatis () {
+   my @cmd = ('/usr/libexec/makewhatis');
+   push @cmd, '-a' if $append_p;
+   push @cmd, ('-i', $indent) if defined $indent;
+   push @cmd, ('-n', $name) if defined $name;
+   push @cmd, ('-o', $output) if defined $output;
+   push @cmd, '-v' if $verbose_p;
+   push @cmd, '-L' if $localized_p;
+   push @cmd, split(/:/, $manpath);
+   exec { $cmd[0] } @cmd;
+   die "$cmd[0]: exec: $!\n";
+}
+
+GetOptions(
+   'a|append'		=> \$append_p,
+   'i|indent=i'		=> \$indent,
+   'n|name=s'		=> \$name,
+   'o|output=s'		=> \$output,
+   'v|verbose'		=> \$verbose_p,
+   'L|localized'	=> \$localized_p,
+) || exit(1);
+
+
+my $path = `/bin/showpath standard vendor current`;
+my $manpath = $path;
+$manpath = s/(?<=\/)(?:s?bin|maintenance|servers|libexec)$/man/g;
+
+makewhatis $manpath;
