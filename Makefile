@@ -1,6 +1,7 @@
 install: /usr/local/sbin/fanspeedd \
 	/usr/local/sbin/fanspeed \
 	/usr/local/sbin/hibernate \
+	/usr/local/sbin/recover-ssh-agent \
 	/usr/local/sbin/run_makewhatis \
 	/usr/local/sbin/sleepnow \
 
